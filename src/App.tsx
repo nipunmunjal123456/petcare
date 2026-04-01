@@ -87,7 +87,7 @@ export default function App() {
   ];
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
     if (loading) {
       let i = 0;
       setLoadingMessage(loadingMessages[0]);
