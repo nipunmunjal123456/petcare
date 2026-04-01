@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required) - The unique Firebase Auth ID.
+    //   - displayName: string (required) - The user's public name.
+    //   - photoURL: string (optional) - The user's profile picture URL.
+    //   - email: string (required, PII) - The user's private email.
+    //   - createdAt: timestamp (required) - When the profile was created.
+    //
+    // Collection: posts
+    // Document ID: {postId}
+    // Fields:
+    //   - authorId: string (required, immutable) - The UID of the poster.
+    //   - authorName: string (required) - Denormalized name.
+    //   - authorPhoto: string (optional) - Denormalized photo.
+    //   - title: string (required, max 100 chars)
+    //   - content: string (required, max 5000 chars)
+    //   - species: string (required, enum: ['dog', 'cat', 'general'])
+    //   - createdAt: timestamp (required, immutable)
+    //   - likesCount: number (required, default 0)
+    //
+    // Collection: posts/{postId}/comments
+    // Document ID: {commentId}
+    // Fields:
+    //   - postId: string (required, immutable)
+    //   - authorId: string (required, immutable)
+    //   - authorName: string (required)
+    //   - authorPhoto: string (optional)
+    //   - content: string (required, max 1000 chars)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: likes
+    // Document ID: {uid_postId}
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - postId: string (required, immutable)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "munjalnipun786@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'photoURL', 'email', 'createdAt', 'role']) &&
+             data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 50 &&
+             isValidEmail(data.email) &&
+             (data.photoURL == null || isValidUrl(data.photoURL)) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidPost(data) {
+      return hasOnlyAllowedFields(['authorId', 'authorName', 'authorPhoto', 'title', 'content', 'species', 'createdAt', 'likesCount']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() > 0 && data.authorName.size() < 50 &&
+             (data.authorPhoto == null || isValidUrl(data.authorPhoto)) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+             data.species in ['dog', 'cat', 'general'] &&
+             data.createdAt is timestamp &&
+             data.likesCount is number;
+    }
+
+    function isValidComment(data) {
+      return hasOnlyAllowedFields(['postId', 'authorId', 'authorName', 'authorPhoto', 'content', 'createdAt']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() > 0 && data.authorName.size() < 50 &&
+             (data.authorPhoto == null || isValidUrl(data.authorPhoto)) &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 1000 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidLike(data) {
+      return hasOnlyAllowedFields(['uid', 'postId', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.postId is string &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
+    }
+
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidPost(request.resource.data) && request.resource.data.likesCount == 0;
+      allow update: if isAuthenticated() && (
+        // Author update
+        (isOwner(resource.data.authorId) && isValidPost(request.resource.data) && request.resource.data.likesCount == resource.data.likesCount) ||
+        // Like count update (Atomic increment/decrement)
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']) &&
+          math.abs(request.resource.data.likesCount - resource.data.likesCount) == 1 &&
+          (
+            // Increment
+            (request.resource.data.likesCount > resource.data.likesCount &&
+             !exists(/databases/$(database)/documents/likes/$(request.auth.uid + '_' + postId)) &&
+             getAfter(/databases/$(database)/documents/likes/$(request.auth.uid + '_' + postId)) != null) ||
+            // Decrement
+            (request.resource.data.likesCount < resource.data.likesCount &&
+             exists(/databases/$(database)/documents/likes/$(request.auth.uid + '_' + postId)) &&
+             getAfter(/databases/$(database)/documents/likes/$(request.auth.uid + '_' + postId)) == null)
+          )
+        ) ||
+        isAdmin()
+      );
+      allow delete: if isOwner(resource.data.authorId) || isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isValidComment(request.resource.data);
+        allow update: if isOwner(resource.data.authorId) && isValidComment(request.resource.data);
+        allow delete: if isOwner(resource.data.authorId) || isAdmin();
+      }
+    }
+
+    match /likes/{likeId} {
+      allow read: if isAuthenticated() && likeId.startsWith(request.auth.uid + '_');
+      allow create: if isAuthenticated() && isValidLike(request.resource.data) && likeId == request.auth.uid + '_' + request.resource.data.postId;
+      allow delete: if isAuthenticated() && likeId.startsWith(request.auth.uid + '_');
+    }
+  }
+}

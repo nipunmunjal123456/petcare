@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Public and private user information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique Firebase Auth ID." },
+        "displayName": { "type": "string", "description": "The user's public name." },
+        "photoURL": { "type": "string", "description": "The user's profile picture URL." },
+        "email": { "type": "string", "format": "email", "description": "The user's private email." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." }
+      },
+      "required": ["uid", "displayName", "email", "createdAt"]
+    },
+    "Post": {
+      "title": "Forum Post",
+      "description": "A discussion topic shared by a pet owner.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorPhoto": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "species": { "type": "string", "enum": ["dog", "cat", "general"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "likesCount": { "type": "integer" }
+      },
+      "required": ["authorId", "authorName", "title", "content", "species", "createdAt"]
+    },
+    "Comment": {
+      "title": "Post Comment",
+      "description": "A reply to a forum post.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorPhoto": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "authorId", "authorName", "content", "createdAt"]
+    },
+    "Like": {
+      "title": "Post Like",
+      "description": "A tracking document for post likes.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "postId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "postId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profile documents." },
+    "/posts/{postId}": { "schema": "Post", "description": "Forum posts." },
+    "/posts/{postId}/comments/{commentId}": { "schema": "Comment", "description": "Comments on a post." },
+    "/likes/{likeId}": { "schema": "Like", "description": "Tracking likes to prevent duplicates." }
+  }
+}
