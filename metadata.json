@@ -1,5 +1,5 @@
 {
   "name": "PetCare AI Assistant",
   "description": "An AI-powered health assistant for dogs and cats, providing vaccination schedules and medicine suggestions based on symptoms.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["geolocation"]
 }

@@ -24,7 +24,8 @@ import {
   LogOut,
   Send,
   ThumbsUp,
-  MessageCircle
+  MessageCircle,
+  MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
@@ -34,6 +35,7 @@ import { cn } from './lib/utils';
 import { PetInfo, HistoryItem, HistoryType } from './types';
 import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from './firebase';
 import Forum from './components/Forum';
+import NearbyVets from './components/NearbyVets';
 import { 
   collection, 
   query, 
@@ -72,7 +74,7 @@ export default function App() {
   const [dosageAdvice, setDosageAdvice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'health' | 'vaccines' | 'dosage' | 'history' | 'forum'>('health');
+  const [activeTab, setActiveTab] = useState<'health' | 'vaccines' | 'dosage' | 'history' | 'forum' | 'vets'>('health');
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   const loadingMessages = [
@@ -506,6 +508,15 @@ export default function App() {
                 >
                   <MessageSquare size={16} /> Forum
                 </button>
+                <button
+                  onClick={() => setActiveTab('vets')}
+                  className={cn(
+                    "px-4 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 text-sm",
+                    activeTab === 'vets' ? "bg-[#2D2D2D] text-white" : "bg-[#F5F5F5] text-[#666] hover:bg-[#EEE]"
+                  )}
+                >
+                  <MapPin size={16} /> Nearby Vets
+                </button>
               </div>
             </div>
 
@@ -884,6 +895,17 @@ export default function App() {
                         <p className="text-[#999]">Share advice, experiences, and support with other pet owners.</p>
                       </div>
                       <Forum user={user} />
+                    </motion.div>
+                  )}
+
+                  {activeTab === 'vets' && (
+                    <motion.div
+                      key="vets"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                    >
+                      <NearbyVets />
                     </motion.div>
                   )}
                 </AnimatePresence>
