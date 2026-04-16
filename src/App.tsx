@@ -36,6 +36,7 @@ import { PetInfo, HistoryItem, HistoryType } from './types';
 import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, User } from './firebase';
 import Forum from './components/Forum';
 import NearbyVets from './components/NearbyVets';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { 
   collection, 
   query, 
@@ -1047,6 +1048,7 @@ export default function App() {
       <footer className="max-w-5xl mx-auto px-6 py-12 border-t border-[#EEE] text-center">
         <p className="text-[#999] text-sm">© 2026 PetCare AI Assistant. Helping you keep your best friends healthy.</p>
       </footer>
+      <SpeedInsights />
     </div>
   );
 }
